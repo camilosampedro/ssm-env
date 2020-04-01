@@ -55,17 +55,17 @@ func main() {
 	flag.Parse()
 	args := flag.Args()
 
+	if len(args) <= 0 {
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	logVerbose(verbose, "flags:\n")
 	logVerbose(verbose, "template: %s\n", *template)
 	logVerbose(verbose, "decrypt: %b\n", decrypt)
 	logVerbose(verbose, "nofail: %b\n", nofail)
 	logVerbose(verbose, "verbose: %b", verbose)
 	logVerbose(verbose, "args: %#v\n", args)
-
-	if len(args) <= 0 {
-		flag.Usage()
-		os.Exit(1)
-	}
 
 	path, err := exec.LookPath(args[0])
 	must(err)
@@ -87,7 +87,7 @@ func main() {
 
 func logVerbose(verbose *bool, template string, args ...interface{}) {
 	if *verbose {
-		must(fmt.Errorf(template, args...))
+		fmt.Fprintf(os.Stderr, template, args...)
 	}
 }
 
