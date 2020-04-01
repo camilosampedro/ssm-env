@@ -1,4 +1,4 @@
-module github.com/remind101/ssm-env
+module github.com/camilosampedro/ssm-env
 
 go 1.12
 
