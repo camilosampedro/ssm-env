@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws/awserr"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
 	"text/template"
+
+	"github.com/aws/aws-sdk-go/aws/awserr"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
@@ -48,10 +49,18 @@ func main() {
 	var (
 		template = flag.String("template", DefaultTemplate, "The template used to determine what the SSM parameter name is for an environment variable. When this template returns an empty string, the env variable is not an SSM parameter")
 		decrypt  = flag.Bool("with-decryption", false, "Will attempt to decrypt the parameter, and set the env var as plaintext")
-		nofail  = flag.Bool("no-fail", false, "Don't fail if error retrieving parameter")
+		nofail   = flag.Bool("no-fail", false, "Don't fail if error retrieving parameter")
+		verbose  = flag.Bool("verbose", false, "Show verbose logs when running")
 	)
 	flag.Parse()
 	args := flag.Args()
+
+	logVerbose(verbose, "flags:\n")
+	logVerbose(verbose, "template: %s\n", *template)
+	logVerbose(verbose, "decrypt: %b\n", decrypt)
+	logVerbose(verbose, "nofail: %b\n", nofail)
+	logVerbose(verbose, "verbose: %b", verbose)
+	logVerbose(verbose, "args: %#v\n", args)
 
 	if len(args) <= 0 {
 		flag.Usage()
@@ -70,9 +79,16 @@ func main() {
 		t:         t,
 		ssm:       ssm.New(session.Must(awsSession())),
 		os:        os,
+		verbose:   verbose,
 	}
 	must(e.expandEnviron(*decrypt, *nofail))
 	must(syscall.Exec(path, args[0:], os.Environ()))
+}
+
+func logVerbose(verbose *bool, template string, args ...interface{}) {
+	if *verbose {
+		must(fmt.Errorf(template, args))
+	}
 }
 
 func awsSession() (*session.Session, error) {
@@ -127,6 +143,7 @@ type expander struct {
 	ssm       ssmClient
 	os        environ
 	batchSize int
+	verbose   *bool
 }
 
 func (e *expander) parameter(k, v string) (*string, error) {
@@ -206,13 +223,15 @@ func (e *expander) getParameters(names []string, decrypt bool, nofail bool) (map
 		input.Names = append(input.Names, aws.String(n))
 	}
 
+	logVerbose(e.verbose, "Getting parameters: %#v", input)
+
 	resp, err := e.ssm.GetParameters(input)
-	if err != nil && ! nofail {
+	if err != nil && !nofail {
 		return values, err
 	}
 
 	if len(resp.InvalidParameters) > 0 {
-		if ! nofail {
+		if !nofail {
 			return values, newInvalidParametersError(resp)
 		}
 		fmt.Fprintf(os.Stderr, "ssm-env: %v\n", newInvalidParametersError(resp))
