@@ -87,7 +87,7 @@ func main() {
 
 func logVerbose(verbose *bool, template string, args ...interface{}) {
 	if *verbose {
-		must(fmt.Errorf(template, args))
+		must(fmt.Errorf(template, args...))
 	}
 }
 
